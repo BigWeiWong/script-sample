@@ -32,6 +32,7 @@ def main():
         separate = [args.separate]
     else:
         separate = ''
+
     if not args.dataframe:
         mutation_df_outfile = args.outfile.replace('.out', 'replace.out')
         print(mutation_df_outfile)
@@ -41,14 +42,17 @@ def main():
         mutation_df = pd.read_table(args.dataframe, sep='\t')
         rc = re.compile(r"\[|\]|\'|,")
         mutation_df[['replace']] = mutation_df[['replace']].apply(lambda x: x.apply(lambda x: rc.sub('', x).split()))
+
     num_processes = max(len(os.sched_getaffinity(0)) - 10, 5)
     chunk_size = int(mutation_df.shape[0]/num_processes)
     chunks = [mutation_df.ix[mutation_df.index[i:i + chunk_size]] for i
               in range(0, mutation_df.shape[0], chunk_size)]
     pool = Pool(processes=num_processes)
     gene_pair_df = pd.concat(pool.map(partial(sample_sort, paralogous=args.paralogous), chunks))
+
     if not args.paralogous:
         gene_pair_df = gene_pair_df.groupby(['replace'])['replace'].apply(list).reset_index()
+
     write_table(gene_pair_df, args.outfile)
 
 
@@ -82,7 +86,6 @@ def generate_mutation_df(mutation_file, LoF, separate):
         cell_mutation['replace'] = cell_mutation['replace'].apply(
             lambda x: 'replace' if [l.split('|')[vep_field_names.index('replace')] for l in
                                     x.split("replace")[-1].split(',')].count('replace') > 0 else '')
-
     else:
         mutation_class = pd.read_table('replace', sep='\t', comment='#')
         cell_mutation['replace'] = mutation_class.iloc[0:mutation_class.shape[0], ]
@@ -99,17 +102,13 @@ def generate_mutation_df(mutation_file, LoF, separate):
     cell_annotation['replace'] = cell_annotation[cell_annotation['replace'] == 'replace'].groupby('replace')[
         'replace'].transform('size')
     cell_annotation['replace'] = cell_annotation['replace'].apply(lambda x: re.match(r"^(\w+-\w+)", x).group(0))
-    total_sample = cell_annotation['replace'].drop_duplicates()
     mutation_df = cell_mutation.groupby(
             ['replace'])['replace'].apply(lambda x: x.unique()).reset_index(name='replace')
-    mutation_df['replace'] = mutation_df['replace'].apply(lambda x: np.setdiff1d(total_sample, x).tolist())
     if separate != '':
         missense_mutation_filter = cell_mutation[cell_mutation['replace'].isin(['replace'])].groupby(
             ['replace'])['replace'].apply(lambda x: x.unique()).reset_index(name='replace')
         mutation_df = mutation_df.merge(missense_mutation_filter[['replace', 'replace']],
                                         left_on='replace', right_on='replace', how='left')
-        mutation_df['replace'] = mutation_df['replace']
-        mutation_df['replace'] = mutation_df['replace'].apply(lambda x: [] if isinstance(x, float) else x.tolist())
         mutation_df = mutation_df.drop(['replace'], axis=1)
     if LoF:
         ko_mutation_filter = cell_mutation[cell_mutation['replace'] == 'replace'].groupby(
@@ -123,10 +122,7 @@ def generate_mutation_df(mutation_file, LoF, separate):
                 ['replace'])['replace'].apply(lambda x: x.unique()).reset_index(name='replace')
     mutation_df = mutation_df.merge(ko_mutation_filter[['replace', 'replace']],
                           left_on='replace', right_on='replace', how='left')
-    mutation_df['replace'] = mutation_df['replace'].apply(lambda x: [] if isinstance(x, float) else x.tolist())
     mutation_df['replace'] = mutation_df.apply(lambda x: np.setdiff1d(x['replace'], x['replace']).tolist(), axis=1)
-    mutation_df['replace'] = mutation_df['replace'].apply(lambda x: len(x))
-    mutation_df['replace'] = mutation_df['replace'].apply(lambda x: len(x))
     mutation_df['replace'] = mutation_df['replace'].apply(lambda x: len(x))
     mutation_df = mutation_df.drop(['replace'], axis=1)
     return mutation_df
@@ -141,9 +137,8 @@ def sample_sort(mutation_df, paralogous):
     cell_annotation = pd.read_table('file', sep='\t')
     cell_annotation['replace'] = cell_annotation[cell_annotation['replace'] == 'replace'].groupby('replace')[
         'replace'].transform('size')
-    cell_annotation['replace'] = cell_annotation['replace'].apply(lambda x: re.match(r"^(\w+-\w+)", x).group(0))
     sample_type = cell_annotation['replace'].drop_duplicates()
-    gene_family = pd.read_table('replace')
+    gene_family = pd.read_table('replace', sep='\t')
     paralogous_gene = pd.read_table('replace', sep='\t')
     for index, row in mutation_df.iterrows():
         mutation_tmp = row[0]

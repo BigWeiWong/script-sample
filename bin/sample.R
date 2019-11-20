@@ -21,7 +21,7 @@ source("some package")
 
 options(stringsAsFactors = FALSE)
 
-###boxplot sample
+##### boxplot sample #####
 infile_list = c('replace',
               'replace',
               'replace')
@@ -44,7 +44,7 @@ for(infile in infile_list){
   ggsave(outfile, boxplot_tmp)
 }
 
-###heatmap sample
+##### heatmap sample #####
 infile_list = c('replace',
                 'replace',
                 'replace',
